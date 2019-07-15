@@ -1,7 +1,11 @@
 /*
-* Send analog readings in RF24 radio payload.
+* Send joystick readings in RF24 radio payload.
 *
-* Test and debug sketch for joystick protoshield
+* This can be used to send raw measurements, or scaled to PWM ranges,
+* depending which «xxx»ToPacket function is being used.
+*
+* Replacing those, and enabling debug, is an easy way to test out other
+* simulation and profile ideas.
 *
 * Initially based on the GettingStarted RF24 library example.
 *
@@ -12,15 +16,19 @@
 #include <SPI.h>
 #include "RF24.h"
 
+// Uncomment the following define, to enable basic status reporting to the
+// serial port
+// #define DEBUG_ON 1
+
 // Specify which pins the joystick potentiometers and button are attached to
 const int FIRST_A_IN_SOURCE = A0;
 const int SECOND_A_IN_SOURCE = A1;
 const int BUTTON_SOURCE = 16;
 const unsigned long PACKET_DELAY = 50;  // milliseconds (0.05 seconds)
-const byte pipeAddress[] = "1Node";  // Must be the same as opened by receiver
 // Lower values give faster response
-const int MAX_SENSOR = 1023;  // 10 bit ADC
-const int MAX_MAP_ANALOG = 255;  // standard PWM analogWrite maximum
+const byte pipeAddress[] = "1Node";  // Must be the same as opened by receiver
+const int MAX_SENSOR = 1023;      // 10 bit ADC
+const int MAX_MAP_ANALOG = 255;   // standard PWM analogWrite maximum
 const int MIN_MAP_ANALOG = -255;  // negative for backwards
 
 // Raw sensor
@@ -36,11 +44,11 @@ struct appPacket {
 };
 
 /* Hardware configuration: Set up nRF24L01 radio on SPI bus plus pins 7 & 8 */
-RF24 radio( 7, 8 );
+RF24 radio(7, 8);
 
 
 void setup() {
-  Serial.begin( 115200 );
+  Serial.begin(115200);
   Serial.print(F("Joystick Test Starting up"));
 
   pinMode( BUTTON_SOURCE, INPUT_PULLUP);  // Use internal pullup so pin does not `float`
@@ -62,9 +70,14 @@ void loop() {
   appPacket rfMessage;
 
   joystick = readJoystick();
+#ifdef DEBUG_ON
   reportRawJoystick(joystick);  // Testing / debug
-  rfMessage = joystickToPacket(joystick);
+#endif
+  // rfMessage = rawToPacket(joystick);
+  rfMessage = scaleToPacket(joystick);
+#ifdef DEBUG_ON
   reportDataPacket(rfMessage);  // Testing / debug
+#endif
 
   if(!radio.write(&rfMessage, sizeof(appPacket))) {
     Serial.println(F("tx error"));  // No ack seen
@@ -90,23 +103,47 @@ joystickSensor readJoystick()
 
 
 /**
- * joystickToPacket
- * Convert joystick measurements to data packet for radio
+ * rawToPacket
+ * Populate the data packet with raw measurements
  *
  * @params jStick joystick measurement values
- * @returns applicate data packet
+ * @returns application data packet
  */
-appPacket joystickToPacket(joystickSensor jStick) {
+appPacket rawToPacket(joystickSensor jStick) {
   appPacket data;
-
-  // Convert raw sensor values to control range: natural and inverted
-  data.x = map( jStick.x, 0, MAX_SENSOR, MIN_MAP_ANALOG, MAX_MAP_ANALOG );
-  data.y = map( jStick.y, 0, MAX_SENSOR, MAX_MAP_ANALOG, MIN_MAP_ANALOG );
-  data.z = map( jStick.button, 0, 1, 1, 0 );  // inverted
+  // Fill the data packet with the raw measured values
+  data.x = jStick.x;
+  data.y = jStick.y;
+  data.z = jStick.button;
   return data;
-}
+}  // ./rawToPacket()
 
 
+/**
+ * scaleToPacket
+ * Scale joystick measurements to ± maximum valud PWM values
+ * Linear mapping, with zero **assumed** to be center range
+ *
+ * @params jStick joystick measurement values
+ * @returns application data packet
+ */
+appPacket scaleToPacket(joystickSensor jStick) {
+  appPacket data;
+  // Convert raw sensor values to control range: natural and inverted
+  data.x = map(jStick.x, 0, MAX_SENSOR, MIN_MAP_ANALOG, MAX_MAP_ANALOG);
+  data.y = map(jStick.y, 0, MAX_SENSOR, MAX_MAP_ANALOG, MIN_MAP_ANALOG);
+  data.z = map(jStick.button, 0, 1, 1, 0);  // inverted
+  return data;
+}  // ./scaleToPacket()
+
+
+// IDEA: create a joystick profile that includes the actual minimum, maximum,
+// and _neutral_ values, then split the scaling based on that.  Make sure to
+// limit the readings to the profile range, so that the mapping can never go
+// outside of the valid range.
+
+
+#ifdef DEBUG_ON
 /**
  * reportRawJoystick
  * send the raw joystick readings to the serial port
@@ -139,3 +176,4 @@ void reportDataPacket(appPacket packet) {
   Serial.print(F("; z="));
   Serial.println(packet.z);
 }  // ./reportDataPacket()
+#endif
