@@ -6,4 +6,4 @@ This can be used as the sender sketch for remote control of the [carbot](https:/
 
 This code demonstrates using a struct for the packet buffer, and passing internal data around.  The fields can be populated directly, instead of needing to append each to end of the buffer array.  This simplifies some of the code, as well as providing a little code level documentation about what is in the buffer.
 
-The only global varibles are constants used to match the hardware configuration, and one for the radio.  Avoiding global varibles reduces the chance of creating some types of program bugs.
+The only global variables are constants used to match the hardware configuration, and one for the radio.  Avoiding global variables reduces the chance of creating some types of program bugs.

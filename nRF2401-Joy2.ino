@@ -121,7 +121,7 @@ appPacket rawToPacket(joystickSensor jStick) {
 
 /**
  * scaleToPacket
- * Scale joystick measurements to ± maximum valud PWM values
+ * Scale joystick measurements to ± maximum value PWM values
  * Linear mapping, with zero **assumed** to be center range
  *
  * @params jStick joystick measurement values
